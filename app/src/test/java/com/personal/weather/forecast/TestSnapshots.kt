@@ -32,5 +32,5 @@ object TestSnapshots {
         grid: GridProperties = grid(),
         observation: ObservationProperties? = null,
         zone: String = ZONE,
-    ) = ForecastSnapshot(place, fetchedAt.toEpochMilli(), zone, grid, observation)
+    ): ForecastSnapshot.Nws = ForecastSnapshot.Nws(place, fetchedAt.toEpochMilli(), zone, grid, observation)
 }

@@ -23,7 +23,10 @@ import com.personal.weather.location.ArcGisPlaceSearch
 import com.personal.weather.location.DataStoreRecentPlaces
 import com.personal.weather.location.recentsDataStore
 import com.personal.weather.nws.NwsClient
+import com.personal.weather.openmeteo.OpenMeteoClient
+import com.personal.weather.ui.DataStoreSettings
 import com.personal.weather.ui.WeatherScreen
+import com.personal.weather.ui.settingsDataStore
 import com.personal.weather.ui.WeatherViewModel
 import com.personal.weather.ui.theme.WeatherTheme
 import java.io.File
@@ -41,13 +44,17 @@ class MainActivity : ComponentActivity() {
                     .connectTimeout(15, TimeUnit.SECONDS)
                     .readTimeout(20, TimeUnit.SECONDS)
                     .build()
+                val search = ArcGisPlaceSearch(http)
+                // Naming must not hold up the forecast: short overall timeout, falls back to "Current location".
+                val namer = ArcGisPlaceSearch(http.newBuilder().callTimeout(5, TimeUnit.SECONDS).build())
                 WeatherViewModel(
-                    source = WeatherRepository(NwsClient(http)),
+                    source = WeatherRepository(NwsClient(http), OpenMeteoClient(http), namer),
                     location = AndroidLocationSource(appContext),
-                    placeSearch = ArcGisPlaceSearch(http),
+                    placeSearch = search,
                     recents = DataStoreRecentPlaces(appContext.recentsDataStore),
                     cache = ForecastCache(File(appContext.filesDir, "forecast.json")),
                     saved = createSavedStateHandle(),
+                    settings = DataStoreSettings(appContext.settingsDataStore),
                 )
             }
         }
@@ -77,6 +84,7 @@ class MainActivity : ComponentActivity() {
                     onPickSuggestion = vm::chooseSuggestion,
                     onUseCurrentLocation = vm::useCurrentLocation,
                     onCloseSearch = vm::closeSearch,
+                    onToggleTempUnit = vm::toggleTempUnit,
                 )
             }
         }

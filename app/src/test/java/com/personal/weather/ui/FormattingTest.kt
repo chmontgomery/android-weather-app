@@ -1,5 +1,10 @@
 package com.personal.weather.ui
 
+import com.personal.weather.forecast.ForecastSnapshot
+import com.personal.weather.forecast.TestSnapshots
+import com.personal.weather.location.Country
+import com.personal.weather.location.Place
+import com.personal.weather.openmeteo.OpenMeteoHourly
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -40,9 +45,27 @@ class FormattingTest {
         assertEquals(false, Formatting.tempCoveredByWindChill(48.0, null))
     }
 
+    @Test fun temp_inCelsius() {
+        assertEquals("22°", Formatting.temp(72, TempUnit.C))
+        assertEquals("0°", Formatting.temp(32, TempUnit.C))
+        assertEquals("—", Formatting.temp(null, TempUnit.C))
+    }
+
+    @Test fun tempCoveredByWindChill_comparesInDisplayedUnit() {
+        // 38°F / 37°F differ in °F but both round to 3°C.
+        assertEquals(false, Formatting.tempCoveredByWindChill(38.0, 37.0, TempUnit.F))
+        assertEquals(true, Formatting.tempCoveredByWindChill(38.0, 37.0, TempUnit.C))
+    }
+
     @Test fun temp() {
         assertEquals("72°", Formatting.temp(72))
         assertEquals("-3°", Formatting.temp(-3))
         assertEquals("—", Formatting.temp(null))
+    }
+
+    @Test fun sourceCredit() {
+        assertEquals("weather.gov", Formatting.sourceCredit(TestSnapshots.snapshot()))
+        assertEquals("Open-Meteo.com", Formatting.sourceCredit(ForecastSnapshot.OpenMeteo(
+            Place("Lisboa", 38.72, -9.14, Country.PORTUGAL), 0, "Europe/Lisbon", OpenMeteoHourly())))
     }
 }

@@ -51,7 +51,7 @@ fun LocationSearchSheet(
                 OutlinedTextField(
                     value = search.query,
                     onValueChange = onQueryChange,
-                    placeholder = { Text("City or ZIP") },
+                    placeholder = { Text("City, ZIP or postcode") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     modifier = Modifier.weight(1f).focusRequester(focus),

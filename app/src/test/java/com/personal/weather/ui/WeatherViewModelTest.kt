@@ -6,6 +6,7 @@ import com.personal.weather.data.ForecastCache
 import com.personal.weather.data.ForecastSource
 import com.personal.weather.forecast.ForecastSnapshot
 import com.personal.weather.forecast.TestSnapshots
+import com.personal.weather.location.Country
 import com.personal.weather.location.LatLon
 import com.personal.weather.location.LocationSource
 import com.personal.weather.location.Place
@@ -26,6 +27,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -41,12 +43,14 @@ import org.junit.rules.TemporaryFolder
 
 private class FakeSource : ForecastSource {
     val calls = mutableListOf<Triple<Double, Double, String?>>()
+    val countries = mutableListOf<Country>()
     var respond: suspend (Double, Double, String?) -> ForecastSnapshot = { lat, lon, name ->
         TestSnapshots.snapshot(place = Place(name ?: "Blaine, MN", lat, lon))
     }
 
-    override suspend fun fetch(lat: Double, lon: Double, name: String?): ForecastSnapshot {
+    override suspend fun fetch(lat: Double, lon: Double, name: String?, country: Country): ForecastSnapshot {
         calls += Triple(lat, lon, name)
+        countries += country
         return respond(lat, lon, name)
     }
 }
@@ -209,7 +213,7 @@ class WeatherViewModelTest {
         val vm = vm()
         vm.start()
         advanceUntilIdle()
-        assertEquals(ErrorKind.OUTSIDE_US, vm.state.value.fatalError)
+        assertEquals(ErrorKind.OUTSIDE_COVERAGE, vm.state.value.fatalError)
     }
 
     @Test fun successSavesToCache() = runTest {
@@ -305,6 +309,17 @@ class WeatherViewModelTest {
         assertTrue(search.resolved.isEmpty())
     }
 
+    @Test fun tempUnit_loadsFromSettingsAndToggleIsSaved() = runTest {
+        val settings = MemorySettings(TempUnit.C)
+        val vm = WeatherViewModel(source, location, search, recents, cache, settings = settings) { now }
+        advanceUntilIdle()
+        assertEquals(TempUnit.C, vm.state.value.tempUnit)
+        vm.toggleTempUnit()
+        advanceUntilIdle()
+        assertEquals(TempUnit.F, vm.state.value.tempUnit)
+        assertEquals(TempUnit.F, settings.tempUnit.first())
+    }
+
     @Test fun useCurrentLocation_clearsChosenPlace() = runTest {
         val vm = vm()
         vm.start()
@@ -372,7 +387,7 @@ class WeatherViewModelTest {
         vm.openSearch()
         vm.onQueryChange("nowhere")
         advanceUntilIdle()
-        assertEquals("No matching US places", vm.state.value.search.message)
+        assertEquals("No matching places", vm.state.value.search.message)
 
         search.fail = true
         vm.onQueryChange("pine")
@@ -525,6 +540,34 @@ class WeatherViewModelTest {
         vm.start()
         advanceUntilIdle()
         assertTrue(vm.state.value.search.recents.isEmpty())
+    }
+
+    @Test fun currentLocationInPortugal_fetchesWithPortugal() = runTest {
+        location.coords = LatLon(37.10, -8.67)
+        val vm = vm()
+        vm.start()
+        advanceUntilIdle()
+        assertEquals(listOf(Country.PORTUGAL), source.countries)
+    }
+
+    @Test fun chosenPortuguesePlace_fetchesWithItsCountry() = runTest {
+        val vm = vm()
+        vm.start()
+        advanceUntilIdle()
+        vm.choosePlace(Place("Lisboa", 38.72, -9.14, Country.PORTUGAL))
+        advanceUntilIdle()
+        assertEquals(Country.PORTUGAL, source.countries.last())
+    }
+
+    @Test fun chosenPortuguesePlace_survivesProcessDeathWithCountry() = runTest {
+        val saved = SavedStateHandle()
+        val first = WeatherViewModel(source, location, search, recents, cache, saved) { now }
+        first.start()
+        advanceUntilIdle()
+        first.choosePlace(Place("Lisboa", 38.72, -9.14, Country.PORTUGAL))
+        advanceUntilIdle()
+        val second = WeatherViewModel(source, location, search, recents, cache, saved) { now }
+        assertEquals(Country.PORTUGAL, second.state.value.chosen!!.country)
     }
 }
 

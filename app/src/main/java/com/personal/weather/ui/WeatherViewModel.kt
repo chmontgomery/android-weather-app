@@ -8,6 +8,7 @@ import com.personal.weather.data.ForecastSource
 import com.personal.weather.forecast.Forecast
 import com.personal.weather.forecast.ForecastBuilder
 import com.personal.weather.forecast.ForecastSnapshot
+import com.personal.weather.location.Country
 import com.personal.weather.location.Geo
 import com.personal.weather.location.LatLon
 import com.personal.weather.location.LocationSource
@@ -30,7 +31,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
-enum class ErrorKind { OUTSIDE_US, NETWORK }
+enum class ErrorKind { OUTSIDE_COVERAGE, NETWORK }
 
 data class SearchState(
     val open: Boolean = false,
@@ -56,6 +57,7 @@ data class WeatherUiState(
     val fatalError: ErrorKind? = null,
     val needsPermission: Boolean = false,
     val search: SearchState = SearchState(),
+    val tempUnit: TempUnit = TempUnit.F,
 ) {
     val headerName: String get() = chosen?.name ?: snapshot?.place?.name ?: "Current location"
 }
@@ -68,6 +70,7 @@ class WeatherViewModel(
     private val cache: ForecastCache,
     /** Keeps the chosen place across process death / activity recreation (but not a fresh launch). */
     private val saved: SavedStateHandle = SavedStateHandle(),
+    private val settings: SettingsStore = MemorySettings(),
     private val clock: () -> Instant = Instant::now,
 ) : ViewModel() {
     private val _state = MutableStateFlow(WeatherUiState(chosen = restoreChosen()))
@@ -81,6 +84,9 @@ class WeatherViewModel(
     init {
         viewModelScope.launch {
             recents.places.catch { emit(emptyList()) }.collect { list -> _state.update { it.copy(search = it.search.copy(recents = list)) } }
+        }
+        viewModelScope.launch {
+            settings.tempUnit.catch { emit(TempUnit.F) }.collect { unit -> _state.update { it.copy(tempUnit = unit) } }
         }
     }
 
@@ -134,6 +140,21 @@ class WeatherViewModel(
 
     fun refresh() = load(keepDay = true)
 
+    /** Switches °F ↔ °C and remembers the choice. */
+    fun toggleTempUnit() {
+        val next = _state.value.tempUnit.other()
+        _state.update { it.copy(tempUnit = next) }
+        viewModelScope.launch {
+            try {
+                settings.setTempUnit(next)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Not saved this time; the on-screen unit still switched.
+            }
+        }
+    }
+
     fun selectDay(index: Int) {
         _state.update { s ->
             val last = (s.forecast?.days?.size ?: 1) - 1
@@ -163,7 +184,7 @@ class WeatherViewModel(
             delay(SEARCH_DEBOUNCE_MS)
             val (results, message) = try {
                 val found = placeSearch.search(query.trim())
-                found to (if (found.isEmpty()) "No matching US places" else null)
+                found to (if (found.isEmpty()) "No matching places" else null)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -226,7 +247,7 @@ class WeatherViewModel(
                     openSearch(LOCATION_OFF_NOTE)
                     return@launch
                 }
-                fetch(coords, chosen?.name, keepDay)
+                fetch(coords, chosen?.name, chosen?.country ?: Country.of(coords.lat, coords.lon), keepDay)
             } finally {
                 // A newer load may have replaced this one; only the current load clears the spinner.
                 if (loadJob === coroutineContext.job) _state.update { it.copy(loading = false) }
@@ -236,9 +257,9 @@ class WeatherViewModel(
         job.start()
     }
 
-    private suspend fun fetch(coords: LatLon, name: String?, keepDay: Boolean) {
+    private suspend fun fetch(coords: LatLon, name: String?, country: Country, keepDay: Boolean) {
         try {
-            val snapshot = source.fetch(coords.lat, coords.lon, name)
+            val snapshot = source.fetch(coords.lat, coords.lon, name, country)
             // Build before caching: a snapshot we can't build must never reach the cache.
             val forecast = ForecastBuilder.build(snapshot, clock())
             runCatching { cache.save(snapshot) }
@@ -246,7 +267,7 @@ class WeatherViewModel(
         } catch (e: CancellationException) {
             throw e
         } catch (e: NwsException.OutsideCoverage) {
-            _state.update { it.copy(snapshot = null, forecast = null, refreshFailed = false, fatalError = ErrorKind.OUTSIDE_US) }
+            _state.update { it.copy(snapshot = null, forecast = null, refreshFailed = false, fatalError = ErrorKind.OUTSIDE_COVERAGE) }
         } catch (e: Exception) {
             val shown = sequenceOf({ _state.value.snapshot }, { cache.load() })
                 .mapNotNull { it()?.takeIf { s -> Geo.isNear(s.place, coords.lat, coords.lon) } }
@@ -261,13 +282,15 @@ class WeatherViewModel(
         val name = saved.get<String>(KEY_CHOSEN_NAME) ?: return null
         val lat = saved.get<Double>(KEY_CHOSEN_LAT) ?: return null
         val lon = saved.get<Double>(KEY_CHOSEN_LON) ?: return null
-        return Place(name, lat, lon)
+        val country = saved.get<String>(KEY_CHOSEN_COUNTRY)?.let { runCatching { Country.valueOf(it) }.getOrNull() } ?: Country.US
+        return Place(name, lat, lon, country)
     }
 
     private fun saveChosen(place: Place?) {
         saved[KEY_CHOSEN_NAME] = place?.name
         saved[KEY_CHOSEN_LAT] = place?.lat
         saved[KEY_CHOSEN_LON] = place?.lon
+        saved[KEY_CHOSEN_COUNTRY] = place?.country?.name
     }
 
     private fun show(
@@ -292,6 +315,7 @@ class WeatherViewModel(
         private const val KEY_CHOSEN_NAME = "chosen_name"
         private const val KEY_CHOSEN_LAT = "chosen_lat"
         private const val KEY_CHOSEN_LON = "chosen_lon"
+        private const val KEY_CHOSEN_COUNTRY = "chosen_country"
         private const val KEY_PERMISSION_IN_FLIGHT = "permission_in_flight"
         const val SEARCH_DEBOUNCE_MS = 400L
         const val LOCATION_OFF_NOTE = "Location is off — search for a city."

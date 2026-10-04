@@ -48,7 +48,7 @@ class ArcGisPlaceSearchTest {
         val req = server.takeRequest().requestUrl!!
         assertEquals("/geocode/suggest", req.encodedPath)
         assertEquals("pine city", req.queryParameter("text"))
-        assertEquals("USA", req.queryParameter("countryCode"))
+        assertEquals("USA,PRT", req.queryParameter("countryCode"))
         assertEquals("City,Postal", req.queryParameter("category"))
         assertEquals("10", req.queryParameter("maxSuggestions"))
         assertEquals("json", req.queryParameter("f"))
@@ -82,18 +82,19 @@ class ArcGisPlaceSearchTest {
     @Test fun resolve_looksUpCoordinatesByMagicKey() = runTest {
         server.enqueue(MockResponse().setBody("""
             {"spatialReference":{"wkid":4326},"candidates":[
-              {"address":"Pine City, Minnesota","location":{"x":-92.968837,"y":45.826625},"score":100}
+              {"address":"Pine City, Minnesota","location":{"x":-92.968837,"y":45.826625},"score":100,"attributes":{"Country":"USA"}}
             ]}
         """.trimIndent()))
 
         val place = search.resolve(PlaceSuggestion("Pine City, MN", "k1"))
 
-        assertEquals(Place("Pine City, MN", 45.826625, -92.968837), place)
+        assertEquals(Place("Pine City, MN", 45.826625, -92.968837, Country.US), place)
         val req = server.takeRequest().requestUrl!!
         assertEquals("/geocode/findAddressCandidates", req.encodedPath)
         assertEquals("k1", req.queryParameter("magicKey"))
         assertEquals("Pine City, MN", req.queryParameter("SingleLine"))
         assertEquals("1", req.queryParameter("maxLocations"))
+        assertEquals("Country", req.queryParameter("outFields"))
     }
 
     @Test fun resolve_noCandidateIsUnavailable() = runTest {
@@ -106,5 +107,57 @@ class ArcGisPlaceSearchTest {
         server.enqueue(MockResponse().setResponseCode(500))
 
         assertTrue(runCatching { search.resolve(PlaceSuggestion("Pine City, MN", "k1")) }.exceptionOrNull() is PlaceSearchUnavailable)
+    }
+
+    @Test fun search_portugueseLabelsDropCountryCode() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"suggestions":[
+              {"text":"Lagos, Faro, PRT","magicKey":"p1"},
+              {"text":"8600, Bensafrim, Lagos, Faro, PRT","magicKey":"p2"},
+              {"text":"Lagos del Sol, AL, USA","magicKey":"u1"}
+            ]}
+        """.trimIndent()))
+        assertEquals(
+            listOf(PlaceSuggestion("Lagos, Faro", "p1"), PlaceSuggestion("8600, Bensafrim, Lagos, Faro", "p2"), PlaceSuggestion("Lagos del Sol, AL", "u1")),
+            search.search("lagos"),
+        )
+    }
+
+    @Test fun search_puertoRicoLabelledPR() = runTest {
+        server.enqueue(MockResponse().setBody("""{"suggestions":[{"text":"Lagos de Plata, Toa Baja, PRI","magicKey":"r1"}]}"""))
+        assertEquals(listOf(PlaceSuggestion("Lagos de Plata, Toa Baja, PR", "r1")), search.search("lagos"))
+    }
+
+    @Test fun resolve_mapsCountryCodes() = runTest {
+        fun candidate(code: String) = MockResponse().setBody(
+            """{"candidates":[{"location":{"x":-8.7,"y":37.1},"attributes":{"Country":"$code"}}]}"""
+        )
+        server.enqueue(candidate("PRT"))
+        assertEquals(Country.PORTUGAL, search.resolve(PlaceSuggestion("Lagos, Faro", "p1")).country)
+        server.enqueue(candidate("PRI"))
+        assertEquals(Country.US, search.resolve(PlaceSuggestion("Lagos de Plata, Toa Baja, PR", "r1")).country)
+        server.enqueue(candidate("GUM"))
+        assertEquals(Country.US, search.resolve(PlaceSuggestion("Hagatna, GU", "g1")).country)
+        server.enqueue(MockResponse().setBody("""{"candidates":[{"location":{"x":-64.9,"y":18.3},"attributes":{}}]}"""))
+        assertEquals(Country.US, search.resolve(PlaceSuggestion("Charlotte Amalie, VI", "v1")).country)
+    }
+
+    @Test fun nameFor_cityAndRegion() = runTest {
+        server.enqueue(MockResponse().setBody("""{"address":{"City":"Lagos","Region":"Faro","Match_addr":"Lagos, Faro"},"location":{"x":-8.67,"y":37.1}}"""))
+        assertEquals("Lagos, Faro", search.nameFor(37.10, -8.67))
+        val req = server.takeRequest().requestUrl!!
+        assertEquals("/geocode/reverseGeocode", req.encodedPath)
+        assertEquals("-8.67,37.1", req.queryParameter("location"))
+        assertEquals("Locality", req.queryParameter("featureTypes"))
+    }
+
+    @Test fun nameFor_sameCityAndRegionShownOnce() = runTest {
+        server.enqueue(MockResponse().setBody("""{"address":{"City":"Faro","Region":"Faro"}}"""))
+        assertEquals("Faro", search.nameFor(37.02, -7.93))
+    }
+
+    @Test fun nameFor_noCityIsNull() = runTest {
+        server.enqueue(MockResponse().setBody("""{"error":{"code":400,"message":"Cannot perform query."}}"""))
+        assertEquals(null, runCatching { search.nameFor(0.0, 0.0) }.getOrNull())
     }
 }

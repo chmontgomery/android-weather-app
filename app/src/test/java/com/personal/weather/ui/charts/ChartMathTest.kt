@@ -42,6 +42,17 @@ class ChartMathTest {
         assertEquals(ChartMath.Axis(ChartMath.YRange(0.0, 10.0), 5.0), ChartMath.windAxis(listOf(null)))
     }
 
+    @Test fun temperatureAxis_fahrenheitMatchesExistingRange() {
+        assertEquals(ChartMath.Axis(ChartMath.YRange(40.0, 80.0), 10.0), ChartMath.temperatureAxis(listOf(41.0, 72.0), celsius = false))
+    }
+
+    @Test fun temperatureAxis_celsiusUsesFivesWithMinSpanTen() {
+        assertEquals(ChartMath.Axis(ChartMath.YRange(10.0, 25.0), 5.0), ChartMath.temperatureAxis(listOf(10.0, 22.0), celsius = true))
+        assertEquals(ChartMath.Axis(ChartMath.YRange(20.0, 30.0), 5.0), ChartMath.temperatureAxis(listOf(21.0, 23.0), celsius = true))
+        assertEquals(ChartMath.Axis(ChartMath.YRange(-5.0, 10.0), 5.0), ChartMath.temperatureAxis(listOf(-2.0, 7.5), celsius = true))
+        assertEquals(ChartMath.Axis(ChartMath.YRange(0.0, 25.0), 5.0), ChartMath.temperatureAxis(listOf(null), celsius = true))
+    }
+
     @Test fun gridLines() {
         assertEquals(listOf(40.0, 50.0, 60.0, 70.0, 80.0), ChartMath.gridLines(ChartMath.YRange(40.0, 80.0), 10.0))
         assertEquals(6, ChartMath.gridLines(ChartMath.PERCENT_RANGE, 20.0).size)

@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
@@ -82,6 +83,7 @@ fun WeatherScreen(
     onPickSuggestion: (PlaceSuggestion) -> Unit,
     onUseCurrentLocation: () -> Unit,
     onCloseSearch: () -> Unit,
+    onToggleTempUnit: () -> Unit,
 ) {
     // Ticks once a minute so the now-line and "today" stay current while the screen is open.
     val now by produceState(Instant.now()) {
@@ -109,9 +111,12 @@ fun WeatherScreen(
                         val forecast = state.forecast
                         when {
                             forecast != null && forecast.days.isNotEmpty() ->
-                                ForecastContent(state, forecast, now, onSelectDay, onOpenSearch)
+                                ForecastContent(state, forecast, now, onSelectDay, onOpenSearch, onToggleTempUnit)
                             else -> {
-                                Header(state.headerName, statusText(state, now), state.refreshFailed, state.loading, null, null, null, onOpenSearch)
+                                Header(
+                                    state.headerName, statusText(state, now), state.refreshFailed, state.loading,
+                                    null, null, null, state.tempUnit, onOpenSearch, onToggleTempUnit,
+                                )
                                 CenterMessage(state, onRefresh)
                             }
                         }
@@ -132,6 +137,7 @@ private fun ColumnScope.ForecastContent(
     now: Instant,
     onSelectDay: (Int) -> Unit,
     onOpenSearch: () -> Unit,
+    onToggleTempUnit: () -> Unit,
 ) {
     val days = forecast.days
     val pagerState = rememberPagerState(initialPage = state.selectedDay.coerceIn(days.indices)) { days.size }
@@ -153,14 +159,16 @@ private fun ColumnScope.ForecastContent(
         status = statusText(state, now),
         statusIsWarning = state.refreshFailed,
         loading = state.loading,
-        bigTemp = Formatting.temp(if (today) forecast.currentTempF else day.highF) + "F",
-        high = if (today) Formatting.temp(day.highF) else null,
-        low = Formatting.temp(day.lowF),
+        bigTemp = Formatting.temp(if (today) forecast.currentTempF else day.highF, state.tempUnit) + state.tempUnit.name,
+        high = if (today) Formatting.temp(day.highF, state.tempUnit) else null,
+        low = Formatting.temp(day.lowF, state.tempUnit),
+        tempUnit = state.tempUnit,
         onPlaceClick = onOpenSearch,
+        onToggleTempUnit = onToggleTempUnit,
     )
     DayTabs(days, current) { index -> scope.launch { pagerState.animateScrollToPage(index) } }
     HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
-        DayPage(days[page], forecast.timeZone, now, Modifier.fillMaxSize())
+        DayPage(days[page], forecast.timeZone, now, state.tempUnit, Modifier.fillMaxSize())
     }
 }
 
@@ -168,8 +176,8 @@ private fun statusText(state: WeatherUiState, now: Instant): String? {
     val snapshot = state.snapshot
     val zone = ZoneId.systemDefault()
     return when {
-        snapshot != null && state.refreshFailed -> Formatting.refreshFailedLabel(snapshot.fetchedAt, zone)
-        snapshot != null -> Formatting.updatedLabel(snapshot.fetchedAt, now, zone)
+        snapshot != null && state.refreshFailed -> Formatting.refreshFailedLabel(snapshot.fetchedAt, zone) + " · Forecast: " + Formatting.sourceCredit(snapshot)
+        snapshot != null -> Formatting.updatedLabel(snapshot.fetchedAt, now, zone) + " · Forecast: " + Formatting.sourceCredit(snapshot)
         else -> null
     }
 }
@@ -187,7 +195,9 @@ private fun Header(
     bigTemp: String?,
     high: String?,
     low: String?,
+    tempUnit: TempUnit,
     onPlaceClick: () -> Unit,
+    onToggleTempUnit: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp)) {
         if (bigTemp != null) {
@@ -199,7 +209,7 @@ private fun Header(
             }
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-            StatusInfo(status, statusIsWarning, loading)
+            StatusInfo(status, statusIsWarning, loading, tempUnit, onToggleTempUnit)
             Row(
                 Modifier.clickable(onClick = onPlaceClick).padding(start = 8.dp, end = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -218,9 +228,9 @@ private fun Header(
     }
 }
 
-/** The ⓘ button and its popup; a small spinner sits beside it while loading. */
+/** The ⓘ button and its popup (status line, then the rarely used °F/°C switch); a spinner sits beside it while loading. */
 @Composable
-private fun StatusInfo(status: String?, isWarning: Boolean, loading: Boolean) {
+private fun StatusInfo(status: String?, isWarning: Boolean, loading: Boolean, tempUnit: TempUnit, onToggleTempUnit: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (loading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -238,6 +248,13 @@ private fun StatusInfo(status: String?, isWarning: Boolean, loading: Boolean) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                DropdownMenuItem(
+                    text = { Text("Show ${tempUnit.other().symbol}") },
+                    onClick = {
+                        open = false
+                        onToggleTempUnit()
+                    },
                 )
             }
         }
@@ -271,25 +288,28 @@ private fun DayTabs(days: List<DayForecast>, selected: Int, onClick: (Int) -> Un
 }
 
 @Composable
-private fun DayPage(day: DayForecast, zone: ZoneId, now: Instant, modifier: Modifier = Modifier) {
+private fun DayPage(day: DayForecast, zone: ZoneId, now: Instant, unit: TempUnit, modifier: Modifier = Modifier) {
     val colors = LocalChartColors.current
     val nowFraction = if (now >= day.start && now < day.end) ChartMath.xFraction(now, day.start, day.end) else null
     val degrees = { v: Double -> "${v.roundToInt()}°" }
     val percent = { v: Double -> "${v.roundToInt()}%" }
     val mph = { v: Double -> "${v.roundToInt()}" }
     val wind = ChartMath.windAxis(day.hours.flatMap { listOf(it.windMph, it.gustMph) })
+    val temps = day.hours.map { h -> h.tempF?.let(unit::fromF) }
+    val chills = day.hours.map { h -> h.windChillF?.let(unit::fromF) }
+    val tempAxis = ChartMath.temperatureAxis(temps + chills, celsius = unit == TempUnit.C)
     Column(modifier.padding(horizontal = 4.dp)) {
         DualLineChart(
             day = day,
             zone = zone,
             series = listOf(
-                LineSeries("Temperature", colors.temperature, day.hours.map { it.tempF }) { i ->
-                    day.hours[i].let { h -> h.tempF != null && Formatting.tempCoveredByWindChill(h.tempF, h.windChillF) }
+                LineSeries("Temperature", colors.temperature, temps) { i ->
+                    day.hours[i].let { h -> h.tempF != null && Formatting.tempCoveredByWindChill(h.tempF, h.windChillF, unit) }
                 },
-                LineSeries("Wind chill", colors.windChill, day.hours.map { it.windChillF }),
+                LineSeries("Wind chill", colors.windChill, chills),
             ),
-            range = ChartMath.temperatureRange(day.hours.flatMap { listOf(it.tempF, it.windChillF) }),
-            gridStep = 10.0,
+            range = tempAxis.range,
+            gridStep = tempAxis.step,
             axisLabel = degrees,
             valueLabel = degrees,
             nowFraction = nowFraction,
@@ -335,8 +355,8 @@ private fun ColumnScope.CenterMessage(state: WeatherUiState, onRetry: () -> Unit
             state.fatalError != null -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     when (state.fatalError) {
-                        ErrorKind.OUTSIDE_US -> "weather.gov only covers US locations."
-                        ErrorKind.NETWORK -> "Couldn't reach weather.gov."
+                        ErrorKind.OUTSIDE_COVERAGE -> "Only US and Portugal locations are supported."
+                        ErrorKind.NETWORK -> "Couldn't reach the forecast service."
                     },
                     textAlign = TextAlign.Center,
                 )

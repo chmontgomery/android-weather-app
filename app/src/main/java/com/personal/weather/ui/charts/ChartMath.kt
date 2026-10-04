@@ -34,6 +34,17 @@ object ChartMath {
     /** A y-range plus the spacing of its gridlines. */
     data class Axis(val range: YRange, val step: Double)
 
+    /** Temperature axis: °F in 10s (min span 20); °C in 5s (min span 10, 0–25 with no data). */
+    fun temperatureAxis(values: List<Double?>, celsius: Boolean): Axis {
+        if (!celsius) return Axis(temperatureRange(values), 10.0)
+        val present = values.filterNotNull()
+        if (present.isEmpty()) return Axis(YRange(0.0, 25.0), 5.0)
+        val lo = floor(present.min() / 5.0) * 5.0
+        var hi = ceil(present.max() / 5.0) * 5.0
+        if (hi - lo < 10.0) hi = lo + 10.0
+        return Axis(YRange(lo, hi), 5.0)
+    }
+
     /** Wind/gust axis in mph: from 0, gridlines every 5 (up to 20 mph) or 10, at least two steps tall. */
     fun windAxis(values: List<Double?>): Axis {
         val max = values.filterNotNull().maxOrNull() ?: 0.0

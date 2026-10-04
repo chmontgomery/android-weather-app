@@ -3,21 +3,41 @@ package com.personal.weather.forecast
 import com.personal.weather.location.Place
 import com.personal.weather.nws.GridProperties
 import com.personal.weather.nws.ObservationProperties
+import com.personal.weather.openmeteo.OpenMeteoCurrent
+import com.personal.weather.openmeteo.OpenMeteoHourly
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Raw NWS data from one successful fetch. This is what gets cached; [ForecastBuilder] derives everything else. */
+/** Raw data from one successful fetch, per source. This is what gets cached; [ForecastBuilder] derives everything else. */
 @Serializable
-data class ForecastSnapshot(
-    val place: Place,
-    val fetchedAtEpochMs: Long,
-    val timeZone: String,
-    val grid: GridProperties,
-    val observation: ObservationProperties? = null,
-) {
+sealed interface ForecastSnapshot {
+    val place: Place
+    val fetchedAtEpochMs: Long
+    val timeZone: String
     val fetchedAt: Instant get() = Instant.ofEpochMilli(fetchedAtEpochMs)
+
+    @Serializable
+    @SerialName("nws")
+    data class Nws(
+        override val place: Place,
+        override val fetchedAtEpochMs: Long,
+        override val timeZone: String,
+        val grid: GridProperties,
+        val observation: ObservationProperties? = null,
+    ) : ForecastSnapshot
+
+    @Serializable
+    @SerialName("openmeteo")
+    data class OpenMeteo(
+        override val place: Place,
+        override val fetchedAtEpochMs: Long,
+        override val timeZone: String,
+        val hourly: OpenMeteoHourly,
+        val current: OpenMeteoCurrent? = null,
+    ) : ForecastSnapshot
 }
 
 data class HourPoint(
