@@ -49,7 +49,7 @@ class OpenMeteoClient(
     private suspend fun getOnce(url: okhttp3.HttpUrl): String = withContext(Dispatchers.IO) {
         try {
             http.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                val text = response.body?.string().orEmpty()
+                val text = response.body.string()
                 when {
                     response.isSuccessful -> text
                     response.code >= 500 -> throw Retryable("HTTP ${response.code}")

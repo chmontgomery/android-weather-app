@@ -70,7 +70,7 @@ class NwsClient(
         try {
             http.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw NwsException.Http(response.code)
-                response.body?.string() ?: throw NwsException.Http(response.code)
+                response.body.string()
             }
         } catch (e: IOException) {
             throw NwsException.Network(e)

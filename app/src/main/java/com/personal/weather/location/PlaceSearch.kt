@@ -92,7 +92,7 @@ class ArcGisPlaceSearch(
         val body = try {
             http.newCall(Request.Builder().url(url).build()).execute().use { response ->
                 if (!response.isSuccessful) throw PlaceSearchUnavailable("HTTP ${response.code}")
-                response.body?.string() ?: throw PlaceSearchUnavailable("Empty response")
+                response.body.string()
             }
         } catch (e: IOException) {
             throw PlaceSearchUnavailable("Network error", e)
