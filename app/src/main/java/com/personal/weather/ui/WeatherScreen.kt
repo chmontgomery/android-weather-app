@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.personal.weather.forecast.DayForecast
+import com.personal.weather.forecast.DaySlicer
 import com.personal.weather.forecast.Forecast
 import com.personal.weather.location.Place
 import com.personal.weather.location.PlaceSuggestion
@@ -64,7 +65,6 @@ import com.personal.weather.ui.charts.LikelihoodBarChart
 import com.personal.weather.ui.charts.LineSeries
 import com.personal.weather.ui.theme.LocalChartColors
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -93,7 +93,7 @@ fun WeatherScreen(
             val previous = value
             value = Instant.now()
             // Day 0 must roll over at midnight even if the app stays open.
-            if (LocalDate.ofInstant(value, ZoneId.systemDefault()) != LocalDate.ofInstant(previous, ZoneId.systemDefault())) {
+            if (DaySlicer.dateOf(value, ZoneId.systemDefault()) != DaySlicer.dateOf(previous, ZoneId.systemDefault())) {
                 onClockTick()
             }
         }

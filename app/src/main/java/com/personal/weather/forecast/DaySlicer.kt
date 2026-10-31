@@ -15,5 +15,6 @@ object DaySlicer {
         return generateSequence(start) { it.plus(1, ChronoUnit.HOURS) }.takeWhile { it < end }.toList()
     }
 
-    fun dateOf(instant: Instant, zone: ZoneId): LocalDate = LocalDate.ofInstant(instant, zone)
+    // Not LocalDate.ofInstant: that needs API 34 and minSdk is 33.
+    fun dateOf(instant: Instant, zone: ZoneId): LocalDate = instant.atZone(zone).toLocalDate()
 }
