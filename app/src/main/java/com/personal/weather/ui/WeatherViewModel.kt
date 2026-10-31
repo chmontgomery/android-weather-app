@@ -70,7 +70,7 @@ class WeatherViewModel(
     private val recents: RecentStore,
     private val cache: ForecastCache,
     /** Keeps the chosen place across process death / activity recreation (but not a fresh launch). */
-    private val saved: SavedStateHandle = SavedStateHandle(),
+    private val saved: SavedStateHandle,
     private val settings: SettingsStore = MemorySettings(),
     private val clock: () -> Instant = Instant::now,
 ) : ViewModel() {

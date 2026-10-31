@@ -100,7 +100,7 @@ class WeatherViewModelTest {
     private val pine = Place("Pine City, MN", 45.83, -92.97)
     private val cache by lazy { ForecastCache(File(tmp.root, "forecast.json")) }
 
-    private fun vm() = WeatherViewModel(source, location, search, recents, cache) { now }
+    private fun vm() = WeatherViewModel(source, location, search, recents, cache, SavedStateHandle()) { now }
 
     @Test fun start_showsCacheImmediatelyThenFreshData() = runTest {
         cache.save(TestSnapshots.snapshot(fetchedAt = now.minus(Duration.ofHours(2)), grid = TestSnapshots.grid { 10.0 }))
@@ -311,7 +311,7 @@ class WeatherViewModelTest {
 
     @Test fun tempUnit_loadsFromSettingsAndToggleIsSaved() = runTest {
         val settings = MemorySettings(TempUnit.C)
-        val vm = WeatherViewModel(source, location, search, recents, cache, settings = settings) { now }
+        val vm = WeatherViewModel(source, location, search, recents, cache, SavedStateHandle(), settings = settings) { now }
         advanceUntilIdle()
         assertEquals(TempUnit.C, vm.state.value.tempUnit)
         vm.toggleTempUnit()
@@ -322,7 +322,7 @@ class WeatherViewModelTest {
 
     @Test fun themeMode_loadsFromSettingsAndCycleIsSaved() = runTest {
         val settings = MemorySettings(theme = ThemeMode.DARK)
-        val vm = WeatherViewModel(source, location, search, recents, cache, settings = settings) { now }
+        val vm = WeatherViewModel(source, location, search, recents, cache, SavedStateHandle(), settings = settings) { now }
         advanceUntilIdle()
         assertEquals(ThemeMode.DARK, vm.state.value.themeMode)
         assertEquals(ThemeMode.SYSTEM, vm.cycleThemeMode())
@@ -547,7 +547,7 @@ class WeatherViewModelTest {
             override val places: Flow<List<Place>> = kotlinx.coroutines.flow.flow { throw IOException("corrupt") }
             override suspend fun add(place: Place) {}
         }
-        val vm = WeatherViewModel(source, location, search, broken, cache) { now }
+        val vm = WeatherViewModel(source, location, search, broken, cache, SavedStateHandle()) { now }
         vm.start()
         advanceUntilIdle()
         assertTrue(vm.state.value.search.recents.isEmpty())
@@ -596,7 +596,7 @@ class WeatherViewModelEagerDispatchTest {
 
     @Test fun loadThatNeverSuspends_stillClearsLoading() = runTest {
         val location = FakeLocation(coords = null)
-        val vm = WeatherViewModel(FakeSource(), location, FakeSearch(), FakeRecents(), ForecastCache(File(tmp.root, "f.json"))) { TestSnapshots.NOW }
+        val vm = WeatherViewModel(FakeSource(), location, FakeSearch(), FakeRecents(), ForecastCache(File(tmp.root, "f.json")), SavedStateHandle()) { TestSnapshots.NOW }
         vm.start()
         assertFalse(vm.state.value.loading)
         assertTrue(vm.state.value.search.open)

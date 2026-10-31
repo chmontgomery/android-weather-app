@@ -37,7 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -287,7 +287,7 @@ private fun SettingsMenu(
 @Composable
 private fun DayTabs(days: List<DayForecast>, selected: Int, onClick: (Int) -> Unit) {
     val tabColor = LocalChartColors.current.dayTab
-    ScrollableTabRow(selectedTabIndex = selected, edgePadding = 8.dp, indicator = {}, divider = {}) {
+    PrimaryScrollableTabRow(selectedTabIndex = selected, edgePadding = 8.dp, indicator = {}, divider = {}) {
         days.forEachIndexed { i, day ->
             Tab(
                 selected = i == selected,
