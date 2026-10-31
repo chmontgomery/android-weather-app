@@ -3,6 +3,7 @@ package com.personal.weather.ui.charts
 import com.personal.weather.forecast.AmountBlock
 import com.personal.weather.forecast.Likelihood
 import com.personal.weather.forecast.PrecipType
+import com.personal.weather.forecast.SunTimes
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -58,6 +59,10 @@ object ChartMath {
     /** 0 at the day's local midnight, 1 at the next. Uses real elapsed time, so DST days stay correct. */
     fun xFraction(t: Instant, dayStart: Instant, dayEnd: Instant): Float =
         (Duration.between(dayStart, t).toMillis().toDouble() / Duration.between(dayStart, dayEnd).toMillis()).toFloat()
+
+    /** Each night as (from, to) day fractions, clipped to the day. */
+    fun nightBands(nights: List<SunTimes.Night>, dayStart: Instant, dayEnd: Instant): List<Pair<Float, Float>> =
+        nights.map { xFraction(it.start, dayStart, dayEnd).coerceIn(0f, 1f) to xFraction(it.end, dayStart, dayEnd).coerceIn(0f, 1f) }
 
     /** 0 at the bottom of the range, 1 at the top, clamped. */
     fun yFraction(v: Double, range: YRange): Float = ((v - range.min) / range.span).toFloat().coerceIn(0f, 1f)

@@ -54,7 +54,10 @@ data class HourPoint(
 /** A forecast precipitation amount over an NWS interval (usually 6 hours). */
 data class AmountBlock(val start: Instant, val end: Instant, val type: PrecipType, val inches: Double)
 
-/** One calendar day, midnight to midnight in the location's zone. [hours] covers every hour of the day; missing data is null. */
+/**
+ * One calendar day, midnight to midnight in the location's zone. [hours] covers every hour of the day; missing data is null.
+ * [nights] are the parts of the day when the sun is down at the place.
+ */
 data class DayForecast(
     val date: LocalDate,
     val start: Instant,
@@ -63,6 +66,7 @@ data class DayForecast(
     val highF: Int?,
     val lowF: Int?,
     val amounts: List<AmountBlock>,
+    val nights: List<SunTimes.Night>,
 )
 
 data class Forecast(

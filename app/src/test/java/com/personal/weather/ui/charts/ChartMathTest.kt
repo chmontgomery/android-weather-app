@@ -3,6 +3,7 @@ package com.personal.weather.ui.charts
 import com.personal.weather.forecast.AmountBlock
 import com.personal.weather.forecast.Likelihood
 import com.personal.weather.forecast.PrecipType
+import com.personal.weather.forecast.SunTimes
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -16,6 +17,14 @@ class ChartMathTest {
     private val zone = ZoneId.of("America/Chicago")
     private val dayStart = Instant.parse("2026-10-03T05:00:00Z")
     private val dayEnd = Instant.parse("2026-10-04T05:00:00Z")
+
+    @Test fun nightBands_areDayFractionsClampedToTheDay() {
+        val nights = listOf(
+            SunTimes.Night(dayStart, dayStart.plus(6, HOURS)),
+            SunTimes.Night(dayStart.plus(18, HOURS), dayEnd.plus(2, HOURS)),
+        )
+        assertEquals(listOf(0f to 0.25f, 0.75f to 1f), ChartMath.nightBands(nights, dayStart, dayEnd))
+    }
 
     @Test fun temperatureRange_roundsToTensWithMinSpan20() {
         assertEquals(ChartMath.YRange(60.0, 80.0), ChartMath.temperatureRange(listOf(61.0, 65.0)))

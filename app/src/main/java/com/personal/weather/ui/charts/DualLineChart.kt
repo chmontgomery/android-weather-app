@@ -52,10 +52,11 @@ fun DualLineChart(
 ) {
     val colors = LocalChartColors.current
     val measurer = rememberTextMeasurer()
-    Column(modifier) {
+    Column(modifier.chartCard(colors)) {
         ChartLegend(series.map { it.label to it.color })
         Canvas(Modifier.fillMaxWidth().weight(1f)) {
             val plot = plotRect()
+            drawNightBands(day, plot, colors)
             for (v in ChartMath.gridLines(range, gridStep)) {
                 drawYGridLine(plot.yAt(ChartMath.yFraction(v, range)), axisLabel(v), plot, colors, measurer)
             }

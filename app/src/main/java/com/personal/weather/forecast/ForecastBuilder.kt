@@ -43,6 +43,7 @@ object ForecastBuilder {
                 lowF = temps.minOrNull()?.roundToInt(),
                 // Attach each block only to the day holding its midpoint, so a block crossing midnight isn't double counted.
                 amounts = data.amounts.filter { val mid = it.start.plus(Duration.between(it.start, it.end).dividedBy(2)); mid >= start && mid < end },
+                nights = SunTimes.nights(start, end, snapshot.place.lat, snapshot.place.lon),
             )
         }
         return Forecast(snapshot.place, zone, snapshot.fetchedAt, currentTemp?.roundToInt(), days)

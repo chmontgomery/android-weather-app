@@ -32,10 +32,11 @@ fun LikelihoodBarChart(day: DayForecast, zone: ZoneId, nowFraction: Float?, modi
     val colors = LocalChartColors.current
     val measurer = rememberTextMeasurer()
     val hasPrecip = day.hours.any { it.likelihood.isNotEmpty() }
-    Column(modifier) {
+    Column(modifier.chartCard(colors)) {
         ChartLegend(PrecipType.entries.map { precipLabel(it) to colors.precip(it) })
         Canvas(Modifier.fillMaxWidth().weight(1f)) {
             val plot = plotRect()
+            drawNightBands(day, plot, colors)
             Likelihood.entries.forEach { level ->
                 drawYGridLine(plot.yAt(ChartMath.barHeightFraction(level)), level.axisLabel, plot, colors, measurer)
             }

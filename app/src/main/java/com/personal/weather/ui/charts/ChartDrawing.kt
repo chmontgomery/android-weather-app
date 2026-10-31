@@ -12,13 +12,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -29,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.personal.weather.forecast.DayForecast
 import com.personal.weather.ui.theme.ChartColors
+import com.personal.weather.ui.theme.LocalChartColors
 import java.time.ZoneId
 
 internal val AXIS_WIDTH = 34.dp
@@ -71,6 +75,13 @@ internal fun DrawScope.drawYGridLine(y: Float, label: String, plot: Rect, colors
 private fun axisLabelTop(y: Float, height: Int, plot: Rect): Float =
     if (y >= plot.bottom - 0.5f) y - height else y - height / 2f
 
+/** Gray where the sun is down, from the top of the canvas (where value labels can sit) to the plot's bottom edge. Draw first. */
+internal fun DrawScope.drawNightBands(day: DayForecast, plot: Rect, colors: ChartColors) {
+    for ((from, to) in ChartMath.nightBands(day.nights, day.start, day.end)) {
+        drawRect(colors.panelNight, topLeft = Offset(plot.xAt(from), 0f), size = Size(plot.xAt(to) - plot.xAt(from), plot.bottom))
+    }
+}
+
 /** Hourly vertical gridlines (darker every 3 hours) and "12a 3a 6a …" labels under the plot. */
 internal fun DrawScope.drawTimeAxis(day: DayForecast, zone: ZoneId, plot: Rect, colors: ChartColors, measurer: TextMeasurer) {
     for (hour in day.hours) {
@@ -98,6 +109,10 @@ internal fun DrawScope.drawNowLine(nowFraction: Float?, plot: Rect, colors: Char
     )
 }
 
+/** The light card each chart sits on; the vertical padding leaves a gap between stacked cards. */
+internal fun Modifier.chartCard(colors: ChartColors): Modifier =
+    padding(vertical = 2.dp).clip(RoundedCornerShape(10.dp)).background(colors.panelDay).padding(bottom = 2.dp)
+
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 internal fun ChartLegend(items: List<Pair<String, Color>>, modifier: Modifier = Modifier) {
@@ -109,7 +124,7 @@ internal fun ChartLegend(items: List<Pair<String, Color>>, modifier: Modifier = 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).background(color, CircleShape))
                 Spacer(Modifier.width(4.dp))
-                Text(label, style = MaterialTheme.typography.labelSmall)
+                Text(label, style = MaterialTheme.typography.labelSmall, color = LocalChartColors.current.panelText)
             }
         }
     }

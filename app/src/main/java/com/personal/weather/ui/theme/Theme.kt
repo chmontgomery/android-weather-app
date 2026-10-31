@@ -11,7 +11,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.personal.weather.forecast.PrecipType
 
-/** Series colors echo forecast.weather.gov; the dark set is lightened to keep contrast on a dark background. */
+/**
+ * Every chart sits on a light card in both themes, white by day and gray by night (as on forecast.weather.gov), so the
+ * series colors are one set, dark enough for value labels to read on either shade. Only the day tabs follow the theme.
+ */
 @Immutable
 data class ChartColors(
     val temperature: Color,
@@ -27,6 +30,12 @@ data class ChartColors(
     val grid: Color,
     val axisText: Color,
     val now: Color,
+    /** Chart card background while the sun is up. */
+    val panelDay: Color,
+    /** Bands over the chart card while the sun is down. */
+    val panelNight: Color,
+    /** Legend labels on the chart card. */
+    val panelText: Color,
     /** Day tab text and the selected tab's outline. */
     val dayTab: Color,
 ) {
@@ -39,37 +48,25 @@ data class ChartColors(
 
     companion object {
         val Light = ChartColors(
-            temperature = Color(0xFFD32F2F),
-            windChill = Color(0xFF1E5BD8),
-            precipPotential = Color(0xFF1B5E20),
-            skyCover = Color(0xFF8D5524),
-            wind = Color(0xFFB39DDB),
-            gust = Color(0xFF4A148C),
-            rain = Color(0xFF2E9E3E),
-            snow = Color(0xFF1FA2E0),
-            freezingRain = Color(0xFFD25FBF),
-            sleet = Color(0xFFF07F12),
-            grid = Color(0xFFCFCFCF),
-            axisText = Color(0xFF555555),
-            now = Color(0xFF222222),
+            temperature = Color(0xFFB71C1C),
+            windChill = Color(0xFF1546B8),
+            precipPotential = Color(0xFF1B6420),
+            skyCover = Color(0xFF7A4310),
+            wind = Color(0xFF8E24AA),
+            gust = Color(0xFF311B92),
+            rain = Color(0xFF23702A),
+            snow = Color(0xFF0064A8),
+            freezingRain = Color(0xFFAD1F8F),
+            sleet = Color(0xFFA84300),
+            grid = Color(0xFFABABAB),
+            axisText = Color(0xFF4A4A4A),
+            now = Color(0xFF212121),
+            panelDay = Color(0xFFFFFFFF),
+            panelNight = Color(0xFFE0E0E0),
+            panelText = Color(0xFF212121),
             dayTab = Color(0xFF424242),
         )
-        val Dark = ChartColors(
-            temperature = Color(0xFFFF6B6B),
-            windChill = Color(0xFF7EA6FF),
-            precipPotential = Color(0xFF66BB6A),
-            skyCover = Color(0xFFD9A066),
-            wind = Color(0xFFD1C4E9),
-            gust = Color(0xFFA57BE0),
-            rain = Color(0xFF5BD06B),
-            snow = Color(0xFF6CCBFA),
-            freezingRain = Color(0xFFF08FDF),
-            sleet = Color(0xFFFFA64D),
-            grid = Color(0xFF444444),
-            axisText = Color(0xFFBBBBBB),
-            now = Color(0xFFEEEEEE),
-            dayTab = Color(0xFFBDBDBD),
-        )
+        val Dark = Light.copy(dayTab = Color(0xFFBDBDBD))
     }
 }
 

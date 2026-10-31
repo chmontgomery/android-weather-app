@@ -13,6 +13,7 @@ import com.personal.weather.nws.ObservationProperties
 import com.personal.weather.nws.WeatherCondition
 import com.personal.weather.nws.WeatherSeries
 import com.personal.weather.nws.WeatherValue
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit.HOURS
@@ -30,6 +31,16 @@ class ForecastBuilderTest {
         f.days.forEach { assertEquals(24, it.hours.size) }
         assertEquals("Blaine, MN", f.place.name)
         assertEquals(NOW, f.fetchedAt)
+    }
+
+    @Test fun build_marksEachDaysNightsAtThePlace() {
+        // Blaine, MN on Sat Oct 3 2026: sunrise 7:14 AM, sunset 6:49 PM CDT (USNO).
+        val day = ForecastBuilder.build(snapshot(), NOW).days.first()
+        assertEquals(2, day.nights.size)
+        assertEquals(day.start, day.nights[0].start)
+        assertEquals(day.end, day.nights[1].end)
+        assertTrue(Duration.between(Instant.parse("2026-10-03T12:14:00Z"), day.nights[0].end).abs().toMinutes() <= 2)
+        assertTrue(Duration.between(Instant.parse("2026-10-03T23:49:00Z"), day.nights[1].start).abs().toMinutes() <= 2)
     }
 
     @Test fun build_dropsDaysBeforeToday() {
