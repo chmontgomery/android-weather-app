@@ -1,6 +1,8 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
+    // AGP 9 compiles Kotlin itself, so there's no org.jetbrains.kotlin.android plugin here.
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -22,9 +24,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
     }
@@ -32,6 +31,12 @@ android {
         unitTests {
             isIncludeAndroidResources = true
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
