@@ -30,6 +30,8 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            // On SDK 36+, Robolectric's test setup reaches into jdk.internal.access, which Java 17+ hides by default.
+            all { it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED") }
         }
     }
 }
@@ -68,5 +70,7 @@ dependencies {
     testImplementation("androidx.test.ext:junit:1.3.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
+    // ui-test-junit4 brings espresso-core 3.5.0, which calls InputManager.getInstance(), gone in API 37.
+    testImplementation("androidx.test.espresso:espresso-core:3.7.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
