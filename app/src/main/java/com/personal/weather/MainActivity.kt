@@ -1,12 +1,16 @@
 package com.personal.weather
 
 import android.Manifest
+import android.app.UiModeManager
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.Lifecycle
@@ -27,6 +31,7 @@ import com.personal.weather.openmeteo.OpenMeteoClient
 import com.personal.weather.ui.DataStoreSettings
 import com.personal.weather.ui.WeatherScreen
 import com.personal.weather.ui.settingsDataStore
+import com.personal.weather.ui.ThemeMode
 import com.personal.weather.ui.WeatherViewModel
 import com.personal.weather.ui.theme.WeatherTheme
 import java.io.File
@@ -59,10 +64,20 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // The theme setting is applied as Android's per-app night mode, which the system remembers and uses for the
+        // splash screen and the first frame. The manifest's configChanges="uiMode" lets it switch without recreation.
+        val uiModes = getSystemService(UiModeManager::class.java)
+
         setContent {
+            val vm: WeatherViewModel = viewModel(factory = factory)
+            val state by vm.state.collectAsStateWithLifecycle()
+            val dark = isSystemInDarkTheme()
+            LaunchedEffect(dark) {
+                // Without recreation, the bar icons have to be told when the theme flips.
+                val bars = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
+                enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+            }
             WeatherTheme {
-                val vm: WeatherViewModel = viewModel(factory = factory)
-                val state by vm.state.collectAsStateWithLifecycle()
                 val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
                     vm.onPermissionResult(granted)
                 }
@@ -85,8 +100,16 @@ class MainActivity : ComponentActivity() {
                     onUseCurrentLocation = vm::useCurrentLocation,
                     onCloseSearch = vm::closeSearch,
                     onToggleTempUnit = vm::toggleTempUnit,
+                    onCycleThemeMode = { uiModes.setApplicationNightMode(vm.cycleThemeMode().nightMode) },
                 )
             }
         }
     }
 }
+
+private val ThemeMode.nightMode: Int
+    get() = when (this) {
+        ThemeMode.SYSTEM -> UiModeManager.MODE_NIGHT_AUTO
+        ThemeMode.LIGHT -> UiModeManager.MODE_NIGHT_NO
+        ThemeMode.DARK -> UiModeManager.MODE_NIGHT_YES
+    }

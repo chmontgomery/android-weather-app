@@ -320,6 +320,17 @@ class WeatherViewModelTest {
         assertEquals(TempUnit.F, settings.tempUnit.first())
     }
 
+    @Test fun themeMode_loadsFromSettingsAndCycleIsSaved() = runTest {
+        val settings = MemorySettings(theme = ThemeMode.DARK)
+        val vm = WeatherViewModel(source, location, search, recents, cache, settings = settings) { now }
+        advanceUntilIdle()
+        assertEquals(ThemeMode.DARK, vm.state.value.themeMode)
+        assertEquals(ThemeMode.SYSTEM, vm.cycleThemeMode())
+        advanceUntilIdle()
+        assertEquals(ThemeMode.SYSTEM, vm.state.value.themeMode)
+        assertEquals(ThemeMode.SYSTEM, settings.themeMode.first())
+    }
+
     @Test fun useCurrentLocation_clearsChosenPlace() = runTest {
         val vm = vm()
         vm.start()

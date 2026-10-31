@@ -29,7 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -84,6 +84,7 @@ fun WeatherScreen(
     onUseCurrentLocation: () -> Unit,
     onCloseSearch: () -> Unit,
     onToggleTempUnit: () -> Unit,
+    onCycleThemeMode: () -> Unit,
 ) {
     // Ticks once a minute so the now-line and "today" stay current while the screen is open.
     val now by produceState(Instant.now()) {
@@ -111,11 +112,11 @@ fun WeatherScreen(
                         val forecast = state.forecast
                         when {
                             forecast != null && forecast.days.isNotEmpty() ->
-                                ForecastContent(state, forecast, now, onSelectDay, onOpenSearch, onToggleTempUnit)
+                                ForecastContent(state, forecast, now, onSelectDay, onOpenSearch, onToggleTempUnit, onCycleThemeMode)
                             else -> {
                                 Header(
                                     state.headerName, statusText(state, now), state.refreshFailed, state.loading,
-                                    null, null, null, state.tempUnit, onOpenSearch, onToggleTempUnit,
+                                    null, null, null, state.tempUnit, state.themeMode, onOpenSearch, onToggleTempUnit, onCycleThemeMode,
                                 )
                                 CenterMessage(state, onRefresh)
                             }
@@ -138,6 +139,7 @@ private fun ColumnScope.ForecastContent(
     onSelectDay: (Int) -> Unit,
     onOpenSearch: () -> Unit,
     onToggleTempUnit: () -> Unit,
+    onCycleThemeMode: () -> Unit,
 ) {
     val days = forecast.days
     val pagerState = rememberPagerState(initialPage = state.selectedDay.coerceIn(days.indices)) { days.size }
@@ -163,8 +165,10 @@ private fun ColumnScope.ForecastContent(
         high = if (today) Formatting.temp(day.highF, state.tempUnit) else null,
         low = Formatting.temp(day.lowF, state.tempUnit),
         tempUnit = state.tempUnit,
+        themeMode = state.themeMode,
         onPlaceClick = onOpenSearch,
         onToggleTempUnit = onToggleTempUnit,
+        onCycleThemeMode = onCycleThemeMode,
     )
     DayTabs(days, current) { index -> scope.launch { pagerState.animateScrollToPage(index) } }
     HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
@@ -183,8 +187,8 @@ private fun statusText(state: WeatherUiState, now: Instant): String? {
 }
 
 /**
- * One row: big temperature and high/low on the left; on the right an ⓘ (tap for "Updated …" / refresh
- * warning, red while a refresh has failed) with the tappable location name beneath it.
+ * One row: big temperature and high/low on the left; on the right a settings gear (tap for "Updated …" / refresh
+ * warning and the settings; red while a refresh has failed) with the tappable location name beneath it.
  */
 @Composable
 private fun Header(
@@ -196,8 +200,10 @@ private fun Header(
     high: String?,
     low: String?,
     tempUnit: TempUnit,
+    themeMode: ThemeMode,
     onPlaceClick: () -> Unit,
     onToggleTempUnit: () -> Unit,
+    onCycleThemeMode: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp)) {
         if (bigTemp != null) {
@@ -209,7 +215,7 @@ private fun Header(
             }
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-            StatusInfo(status, statusIsWarning, loading, tempUnit, onToggleTempUnit)
+            SettingsMenu(status, statusIsWarning, loading, tempUnit, themeMode, onToggleTempUnit, onCycleThemeMode)
             Row(
                 Modifier.clickable(onClick = onPlaceClick).padding(start = 8.dp, end = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -228,33 +234,50 @@ private fun Header(
     }
 }
 
-/** The ⓘ button and its popup (status line, then the rarely used °F/°C switch); a spinner sits beside it while loading. */
+/**
+ * The gear button and its popup: status line, then the rarely used °F/°C switch and theme setting. The theme row
+ * steps System → Light → Dark and leaves the menu open so you can see each one. A spinner sits beside the gear while loading.
+ */
 @Composable
-private fun StatusInfo(status: String?, isWarning: Boolean, loading: Boolean, tempUnit: TempUnit, onToggleTempUnit: () -> Unit) {
+private fun SettingsMenu(
+    status: String?,
+    isWarning: Boolean,
+    loading: Boolean,
+    tempUnit: TempUnit,
+    themeMode: ThemeMode,
+    onToggleTempUnit: () -> Unit,
+    onCycleThemeMode: () -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (loading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
         Box {
-            IconButton(onClick = { open = true }, enabled = status != null) {
+            IconButton(onClick = { open = true }) {
                 Icon(
-                    Icons.Outlined.Info,
-                    contentDescription = if (isWarning) "Couldn't refresh" else "Last updated",
+                    Icons.Outlined.Settings,
+                    contentDescription = if (isWarning) "Settings (couldn't refresh)" else "Settings",
                     tint = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            DropdownMenu(expanded = open && status != null, onDismissRequest = { open = false }) {
-                Text(
-                    status ?: "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                if (status != null) {
+                    Text(
+                        status,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Show ${tempUnit.other().symbol}") },
                     onClick = {
                         open = false
                         onToggleTempUnit()
                     },
+                )
+                DropdownMenuItem(
+                    text = { Text("Theme: ${themeMode.label}") },
+                    onClick = onCycleThemeMode,
                 )
             }
         }

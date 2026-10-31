@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Follows system light/dark so the window background matches before Compose draws. -->
+    <!-- DayNight follows the app's night mode (the theme setting, or the phone's) so the window matches before Compose draws. -->
     <style name="Theme.Weather" parent="android:Theme.DeviceDefault.DayNight">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>

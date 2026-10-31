@@ -58,6 +58,7 @@ data class WeatherUiState(
     val needsPermission: Boolean = false,
     val search: SearchState = SearchState(),
     val tempUnit: TempUnit = TempUnit.F,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
 ) {
     val headerName: String get() = chosen?.name ?: snapshot?.place?.name ?: "Current location"
 }
@@ -87,6 +88,9 @@ class WeatherViewModel(
         }
         viewModelScope.launch {
             settings.tempUnit.catch { emit(TempUnit.F) }.collect { unit -> _state.update { it.copy(tempUnit = unit) } }
+        }
+        viewModelScope.launch {
+            settings.themeMode.catch { emit(ThemeMode.SYSTEM) }.collect { mode -> _state.update { it.copy(themeMode = mode) } }
         }
     }
 
@@ -144,13 +148,26 @@ class WeatherViewModel(
     fun toggleTempUnit() {
         val next = _state.value.tempUnit.other()
         _state.update { it.copy(tempUnit = next) }
+        save { settings.setTempUnit(next) }
+    }
+
+    /** Steps System → Light → Dark → System, remembers the choice, and returns it for the activity to apply. */
+    fun cycleThemeMode(): ThemeMode {
+        val next = _state.value.themeMode.next()
+        _state.update { it.copy(themeMode = next) }
+        save { settings.setThemeMode(next) }
+        return next
+    }
+
+    /** Saves a setting in the background; if saving fails, the on-screen change still stands. */
+    private fun save(write: suspend () -> Unit) {
         viewModelScope.launch {
             try {
-                settings.setTempUnit(next)
+                write()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // Not saved this time; the on-screen unit still switched.
+                // Not saved this time.
             }
         }
     }
